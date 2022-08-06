@@ -1,0 +1,217 @@
+---
+title: "OWID Monkey Pox"
+author: "David Jackson"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(tidymodels)
+library(forecast)
+library(scales)
+```
+
+## Our World In Data: Monkey Pox Worldwide
+
+```{r}
+rm(list=ls())
+monkey_pox <- read_csv("https://raw.githubusercontent.com/owid/notebooks/main/EdouardMathieu/monkeypox/owid-monkeypox-data.csv") %>% janitor::clean_names()
+dim(monkey_pox)
+```
+```{r}
+summary(monkey_pox)
+```
+
+### Calculate Total Worldwide Cases and Deaths by Date
+
+#### Cases
+
+```{r}
+worldwide_daily <- monkey_pox %>%
+    group_by(date) %>%
+    summarise(Cases = sum(new_cases),
+              Deaths = sum(new_deaths)) %>% ungroup()
+```
+
+```{r}
+worldwide_daily %>% ggplot() + geom_line(aes(x=date,y=Cases)) +
+  labs(title="Worldwide Cases by Date")
+```
+```{r}
+worldwide_daily$Cumcases <- cumsum(worldwide_daily$Cases)
+```
+```{r}
+worldwide_daily %>% ggplot() + geom_line(aes(x=date,y=Cumcases)) +
+  labs(title="Worldwide Cumulative Total Cases by Date")
+```
+
+#### Deaths
+
+```{r}
+worldwide_daily %>% ggplot() + geom_line(aes(x=date,y=Deaths)) +
+  labs(title="Worldwide Deaths by Date")
+```
+```{r}
+worldwide_daily$Cumdeaths <- cumsum(worldwide_daily$Deaths)
+```
+```{r}
+worldwide_daily %>% ggplot() + geom_line(aes(x=date,y=Cumdeaths)) +
+  labs(title="Worldwide Cumulative Total Deaths by Date")
+```
+
+### Begin Models: Worldwide Daily Models
+
+
+```{r}
+Y <- ts(worldwide_daily$Cases,start=c(2022,05,06),frequency = 365)
+class(Y) # Class ts
+```
+
+
+```{r}
+autoplot(Y) + 
+  labs(title ="Worldwide Monkey Pox",y="Daily Cases ")
+```
+```{r}
+DY <- diff(Y)
+
+autoplot(DY) + 
+  labs(title ="Wroldwide Monkey Pox: Difference Plot ")
+```
+```{r}
+## Didn't work
+ggseasonplot(DY) +
+  labs(title = "Seasonial Plot: Change In Daily Sales")
+```
+```{r}
+## Ddon't work
+ggsubseriesplot(DY)
+```
+
+## Forecast with various methods
+
+#### Mean Forecast
+
+```{r}
+fit_mean <- meanf(worldwide_daily$Cases)
+```
+```{r}
+summary(fit_mean)
+```
+```{r}
+checkresiduals(fit_mean)
+# forecast_mean <- forecast(fit_mean,h=90)
+autoplot(forecast_mean)
+```
+
+#### Fit Seasonal Naive: Didn't work
+
+```{r}
+fit_snaive <- snaive(DY) # Residual sd:
+head(fit_snaive)
+```
+```{r}
+summary(fit_snaive)
+```
+```{r}
+checkresiduals(fit_snaive)
+autoplot(fit_snaive)
+```
+
+### ETS forecast
+
+```{r}
+fit_ets <- ets(Y) # sigma:  0.1077
+summary(fit_ets)
+```
+```{r}
+checkresiduals(fit_ets)
+```
+```{r}
+autoplot(fit_ets)
+```
+```{r}
+fcat_ets <- forecast(fit_ets,h=60)
+```
+```{r}
+autoplot(fcat_ets)
+```
+```{r}
+autoplot(fcat_ets,include=36) + labs(title ="4 Years")
+```
+
+## Forecast Cumulative Worldwide Cases
+
+
+```{r}
+YY <- ts(worldwide_daily$Cumcases,start=c(2022,05,06),frequency = 365)
+class(YY) # Class ts
+```
+
+```{r}
+autoplot(YY) + 
+  labs(title ="Worldwide Monkey Pox",y="Cumulative Cases ")
+```
+
+```{r}
+DY <- diff(YY)
+
+autoplot(DY) + 
+  labs(title ="Wroldwide Monkey Pox: Difference Plot ")
+```
+
+## Forecast with various methods
+
+#### Mean Forecast
+
+```{r}
+fit_mean <- meanf(worldwide_daily$Cumcases)
+head(fit_mean)
+```
+```{r}
+summary(fit_mean)
+```
+```{r}
+checkresiduals(fit_mean)
+
+# forecast_mean <- forecast(fit_mean,h=90)
+# autoplot(forecast_mean)
+```
+
+#### Fit Seasonal Naive: Didn't work
+
+```{r}
+# fit_snaive <- snaive(DY) # Residual sd:
+# head(fit_snaive)
+```
+```{r}
+# summary(fit_snaive)
+```
+```{r}
+# checkresiduals(fit_snaive)
+```
+
+### ETS forecast
+
+```{r}
+fit_ets <- ets(YY) # sigma:  0.1077
+summary(fit_ets)
+```
+```{r}
+checkresiduals(fit_ets)
+```
+```{r}
+autoplot(fit_ets)
+```
+```{r}
+fcat_ets <- forecast(fit_ets,h=30)
+```
+```{r}
+autoplot(fcat_ets) +
+  scale_y_continuous(label = comma) +
+  labs(title ="Wordwide Monkey Pox Forecast: Aug. 05,2022",
+       subtitle = "(100,000 by Sept. 5, 2022)")
+```
+
