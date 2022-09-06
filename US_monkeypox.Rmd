@@ -11,13 +11,14 @@ library(tidyverse)
 library(tidymodels)
 library(forecast)
 library(scales)
+library(lubridate)
 ```
 
 ## Our World In Data: Monkey Pox United States
 
 ```{r}
 rm(list=ls())
-monkey_pox <- read_csv("https://raw.githubusercontent.com/owid/notebooks/main/EdouardMathieu/monkeypox/owid-monkeypox-data.csv") %>% janitor::clean_names() %>% filter(location =="United States")
+monkey_pox <- read_csv("https://raw.githubusercontent.com/owid/monkeypox/main/owid-monkeypox-data.csv") %>% janitor::clean_names() %>% filter(location =="United States")
 dim(monkey_pox)
 ```
 ```{r}
@@ -28,6 +29,16 @@ summary(monkey_pox)
 
 #### Cases
 
+```{r}
+monkey_pox$wday <- wday(monkey_pox$date)
+
+worldwide_wday <- monkey_pox %>%
+    group_by(wday) %>%
+    summarise(Cases = sum(new_cases),
+              Deaths = sum(new_deaths)) %>% ungroup()
+
+ggplot(worldwide_wday) + geom_col(aes(x=wday, y=Cases))
+```
 ```{r}
 monkey_daily <- monkey_pox %>%
     group_by(date) %>%
@@ -107,19 +118,6 @@ checkresiduals(fit_mean)
 # autoplot(forecast_mean)
 ```
 
-#### Fit Seasonal Naive: Didn't work
-
-```{r}
-# fit_snaive <- snaive(DY) # Residual sd:
-# head(fit_snaive)
-```
-```{r}
-# summary(fit_snaive)
-```
-```{r}
-# checkresiduals(fit_snaive)
-# autoplot(fit_snaive)
-```
 
 ### ETS forecast
 
@@ -205,7 +203,7 @@ checkresiduals(fit_ets)
 autoplot(fit_ets)
 ```
 ```{r}
-fcat_ets <- forecast(fit_ets,h=14)
+fcat_ets <- forecast(fit_ets,h=30)
 ```
 ```{r}
 autoplot(fcat_ets)
